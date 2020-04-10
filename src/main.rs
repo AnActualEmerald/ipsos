@@ -23,8 +23,11 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("new") {
-        new_watchlist(matches.value_of("NAME").unwrap_or("generic"))
-            .expect("Something went wrong creating the new watchlist");
+        let name = matches.value_of("NAME").unwrap_or("generic");
+        new_watchlist(name).expect("Something went wrong creating the new watchlist");
+        if matches.is_present("switch") {
+            load_list(name).expect(format!("Couldn't switch to watchlist {}", name).as_str());
+        }
     }
 
     if let Some(matches) = matches.subcommand_matches("switch") {
@@ -41,6 +44,52 @@ fn main() {
         )
         .expect("Couldn't add show");
     }
+
+    if let Some(matches) = matches.subcommand_matches("watch") {
+        watch_show(matches.value_of("TITLE").unwrap_or("none")).expect("Couldn't watch the show");
+    }
+
+    if let Some(matches) = matches.subcommand_matches("update") {
+        update_show(
+            matches.value_of("TITLE"),
+            matches.value_of("watched"),
+            matches.is_present("done"),
+        )
+        .expect("Couldn't update the show");
+    }
+}
+
+fn update_show(title: Option<&str>, watched: Option<&str>, done: bool) -> Result<(), Error> {
+    let path = gen_path();
+    let mut ml = read_json(&path)?;
+
+    ml.lists.entry(ml.current.clone()).and_modify(|v| {
+        let title_p = title.unwrap_or(v.current.as_str());
+        let watch_p = if let Ok(i) = watched.unwrap_or("1").parse::<i32>() {
+            i
+        } else {
+            1
+        };
+        v.update(String::from(title_p), watch_p, done);
+    });
+
+    save_json(&ml, &path)?;
+
+    println!("Updated show");
+
+    Ok(())
+}
+
+fn watch_show(title: &str) -> Result<(), Error> {
+    let path = gen_path();
+    let mut ml = read_json(&path)?;
+
+    ml.lists.entry(ml.current.clone()).and_modify(|v| {
+        v.current = title.to_owned();
+    });
+
+    save_json(&ml, &path)?;
+    Ok(())
 }
 
 fn add_show(
@@ -53,6 +102,7 @@ fn add_show(
     let mut ml = read_json(&path)?;
     let mut len_p: i32 = 0;
     let mut watch_p: i32 = 0;
+    let title_p = title.unwrap_or("none").to_owned();
 
     if let Ok(v) = len.unwrap_or("0").parse::<i32>() {
         len_p = v;
@@ -63,18 +113,20 @@ fn add_show(
     }
 
     let show = Show {
-        title: title.unwrap_or("none").to_owned(),
+        title: String::from(&title_p),
         length: len_p,
         watched: watch_p,
         completed: completed,
     };
 
-    ml.lists.entry(String::from(&ml.current)).and_modify(|e| {
+    ml.lists.entry(ml.current.clone()).and_modify(|e| {
         // maybe too much copying but it shouldn't really matter
-        e.shows.insert(String::from(&show.title), show);
+        e.shows.insert(show.title.clone(), show);
     });
 
     save_json(&ml, &path)?;
+
+    println!("Added show {} to watchlist {}", ml.current, title_p);
     Ok(())
 }
 
@@ -83,15 +135,16 @@ fn load_list(name: &str) -> Result<(), Error> {
     let mut ml = read_json(&path)?;
     ml.current = name.to_owned();
     save_json(&ml, &path)?;
+    println!("Switched to list {}", name);
     Ok(())
 }
 
 fn list_shows() -> Result<(), Error> {
     let ml = read_json(&gen_path())?;
-
+    let current = ml.get_current();
     println!("Current Shows: ");
-    ml.get_current().shows.iter().for_each(|(_, v)| {
-        println!(
+    current.shows.iter().for_each(|(_, v)| {
+        let res = format!(
             "{}:\n    Watched: {}%({}/{})\n    Completed: {}",
             v.title,
             ((v.watched as f32 / v.length as f32) * 100.0) as i32,
@@ -99,6 +152,11 @@ fn list_shows() -> Result<(), Error> {
             v.length,
             v.completed
         );
+        if current.current == v.title {
+            println!("\nCurrently watching:\n{}\n\n", res);
+        } else {
+            println!("{}", res);
+        }
     });
 
     Ok(())
@@ -130,6 +188,8 @@ fn new_watchlist(name: &str) -> Result<(), Error> {
     );
 
     save_json(&list, &path)?;
+
+    println!("Created watchlist {}", name);
 
     Ok(())
 }
@@ -225,6 +285,17 @@ impl WatchList {
             res.push(v.title.as_str());
         }
         format!("{}", res.join(", "))
+    }
+
+    fn get_current(&self) -> &Show {
+        &self.shows[&self.current]
+    }
+
+    fn update(&mut self, title: String, watch: i32, done: bool) {
+        self.shows.entry(title).and_modify(|e| {
+            e.watched += watch;
+            e.completed = done;
+        });
     }
 }
 

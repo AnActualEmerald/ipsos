@@ -4,7 +4,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 pub fn get_matches<'a>() -> ArgMatches<'a> {
     App::new("Ipsos Watchlist Manager")
         .version("0.0.1")
-        .author("Emerald")
+        .author("Emerald (https://discord.gg/KwzhFaK)")
         .about("Manage your watchlists with ease from the command line")
         .subcommand(
             SubCommand::with_name("list")
@@ -26,6 +26,12 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                     Arg::with_name("NAME")
                         .help("Name of the new watchlist")
                         .required(true),
+                )
+                .arg(
+                    Arg::with_name("switch")
+                        .help("Switch to the watchlist after creating it")
+                        .long("switch")
+                        .short("s"),
                 ),
         )
         .subcommand(
@@ -73,5 +79,35 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                         .help("Have you already finished the show?"),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("update")
+                .alias("up")
+                .about("Update a show in the watchlist")
+                .help("Running this command with no options will add 1 to the watched episode counter of the current show")
+                .arg(Arg::with_name("TITLE").help(
+                    "The title of the show to update. Will update the current show if omitted",
+                ))
+                .arg(
+                    Arg::with_name("done")
+                        .help("Whether or not you've finished the show")
+                        .long("done")
+                        .short("d"),
+                )
+                .arg(
+                    Arg::with_name("watched")
+                        .help("How many episodes you've watched. Adds to the current total and can be negative. Defaults to +1. Negative values need to use the -w=value form")
+                        .default_value("1")
+                        .takes_value(true)
+                        .long("watched")
+                        .short("w")
+                )
+        ).subcommand(SubCommand::with_name("watch")
+                .alias("w")
+                .about("Watch a show from the watchlist")
+                .arg(Arg::with_name("TITLE").help("Title of the show to watch").required(true)))
         .get_matches()
 }
+
+// pub fn make_yaml_app() -> App {
+//     clap::lo
+// }
