@@ -3,49 +3,23 @@ extern crate dirs;
 extern crate serde;
 extern crate serde_json;
 
-use clap::{App, Arg, SubCommand};
+mod application;
+
 use serde::{Deserialize, Serialize};
-// use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{Error, Read, Write};
 use std::path::PathBuf;
 
 fn main() {
-    let matches = App::new("Ipsos Watchlist Manager")
-        .version("0.0.1")
-        .author("Emerald")
-        .about("Manage your watchlists with ease from the command line")
-        .arg(
-            Arg::with_name("list")
-                .short("l")
-                .long("list")
-                .help("Show all the current watchlists"),
-        )
-        .subcommand(
-            SubCommand::with_name("new")
-                .alias("n")
-                .about("Create a new watchlist")
-                .arg(
-                    Arg::with_name("NAME")
-                        .help("Name of the new watchlist")
-                        .required(true),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("switch")
-                .alias("s")
-                .about("Switch to an existing watchlist")
-                .arg(
-                    Arg::with_name("NAME")
-                        .help("Name of the watchlist to switch to")
-                        .required(true),
-                ),
-        )
-        .get_matches();
+    let matches = application::get_matches();
 
-    if matches.is_present("list") {
-        list_lists().expect("Couldn't read file");
+    if let Some(matches) = matches.subcommand_matches("list") {
+        if matches.is_present("shows") {
+            list_shows().expect("Couldn't read file");
+        } else {
+            list_lists().expect("Couldn't read file");
+        }
     }
 
     if let Some(matches) = matches.subcommand_matches("new") {
@@ -57,6 +31,51 @@ fn main() {
         let name = matches.value_of("NAME").unwrap_or("generic");
         load_list(name).expect(format!("Couldn't switch to watchlist {}", name).as_str());
     }
+
+    if let Some(matches) = matches.subcommand_matches("add") {
+        add_show(
+            matches.value_of("title"),
+            matches.value_of("length"),
+            matches.value_of("watched"),
+            matches.is_present("done"),
+        )
+        .expect("Couldn't add show");
+    }
+}
+
+fn add_show(
+    title: Option<&str>,
+    len: Option<&str>,
+    watched: Option<&str>,
+    completed: bool,
+) -> Result<(), Error> {
+    let path = gen_path();
+    let mut ml = read_json(&path)?;
+    let mut len_p: i32 = 0;
+    let mut watch_p: i32 = 0;
+
+    if let Ok(v) = len.unwrap_or("0").parse::<i32>() {
+        len_p = v;
+    }
+
+    if let Ok(v) = watched.unwrap_or("0").parse::<i32>() {
+        watch_p = v;
+    }
+
+    let show = Show {
+        title: title.unwrap_or("none").to_owned(),
+        length: len_p,
+        watched: watch_p,
+        completed: completed,
+    };
+
+    ml.lists.entry(String::from(&ml.current)).and_modify(|e| {
+        // maybe too much copying but it shouldn't really matter
+        e.shows.insert(String::from(&show.title), show);
+    });
+
+    save_json(&ml, &path)?;
+    Ok(())
 }
 
 fn load_list(name: &str) -> Result<(), Error> {
@@ -67,9 +86,32 @@ fn load_list(name: &str) -> Result<(), Error> {
     Ok(())
 }
 
+fn list_shows() -> Result<(), Error> {
+    let ml = read_json(&gen_path())?;
+
+    println!("Current Shows: ");
+    ml.get_current().shows.iter().for_each(|(_, v)| {
+        println!(
+            "{}:\n    Watched: {}%({}/{})\n    Completed: {}",
+            v.title,
+            ((v.watched as f32 / v.length as f32) * 100.0) as i32,
+            v.watched,
+            v.length,
+            v.completed
+        );
+    });
+
+    Ok(())
+}
+
 fn list_lists() -> Result<(), Error> {
     let ml = read_json(&gen_path())?;
-    println!("Current: {}\n\nLists: {}", ml.current, ml.list());
+    println!(
+        "Current: {}\nShows: {}\n\nLists: {}",
+        ml.current,
+        ml.get_current().list(),
+        ml.list()
+    );
     Ok(())
 }
 
@@ -174,6 +216,16 @@ struct WatchList {
     name: String,
     current: String,
     shows: HashMap<String, Show>,
+}
+
+impl WatchList {
+    fn list(&self) -> String {
+        let mut res = vec![];
+        for (_, v) in self.shows.iter() {
+            res.push(v.title.as_str());
+        }
+        format!("{}", res.join(", "))
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
