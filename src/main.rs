@@ -53,13 +53,19 @@ fn main() {
         update_show(
             matches.value_of("TITLE"),
             matches.value_of("watched"),
+            matches.value_of("length"),
             matches.is_present("done"),
         )
         .expect("Couldn't update the show");
     }
 }
 
-fn update_show(title: Option<&str>, watched: Option<&str>, done: bool) -> Result<(), Error> {
+fn update_show(
+    title: Option<&str>,
+    watched: Option<&str>,
+    len: Option<&str>,
+    done: bool,
+) -> Result<(), Error> {
     let path = gen_path();
     let mut ml = read_json(&path)?;
 
@@ -70,7 +76,14 @@ fn update_show(title: Option<&str>, watched: Option<&str>, done: bool) -> Result
         } else {
             1
         };
-        v.update(String::from(title_p), watch_p, done);
+        let len_p = len.and_then(|i| {
+            if let Ok(e) = i.parse::<i32>() {
+                Some(e)
+            } else {
+                None
+            }
+        });
+        v.update(String::from(title_p), watch_p, len_p, done);
     });
 
     save_json(&ml, &path)?;
@@ -89,6 +102,8 @@ fn watch_show(title: &str) -> Result<(), Error> {
     });
 
     save_json(&ml, &path)?;
+
+    println!("Now watching {}", title);
     Ok(())
 }
 
@@ -126,7 +141,7 @@ fn add_show(
 
     save_json(&ml, &path)?;
 
-    println!("Added show {} to watchlist {}", ml.current, title_p);
+    println!("Added show {} to watchlist {}", title_p, ml.current);
     Ok(())
 }
 
@@ -142,7 +157,16 @@ fn load_list(name: &str) -> Result<(), Error> {
 fn list_shows() -> Result<(), Error> {
     let ml = read_json(&gen_path())?;
     let current = ml.get_current();
+    let s = current.get_current();
     println!("Current Shows: ");
+    println!(
+        "\nCurrently Watching: \n\n   {}:\n       Watched: {}%({}/{})\n       Completed: {}\n",
+        s.title,
+        ((s.watched as f32 / s.length as f32) * 100.0) as i32,
+        s.watched,
+        s.length,
+        s.completed
+    );
     current.shows.iter().for_each(|(_, v)| {
         let res = format!(
             "{}:\n    Watched: {}%({}/{})\n    Completed: {}",
@@ -153,9 +177,9 @@ fn list_shows() -> Result<(), Error> {
             v.completed
         );
         if current.current == v.title {
-            println!("\nCurrently watching:\n{}\n\n", res);
+            // println!("\nCurrently watching:\n{}\n\n", res);
         } else {
-            println!("{}", res);
+            println!("{}\n", res);
         }
     });
 
@@ -287,15 +311,30 @@ impl WatchList {
         format!("{}", res.join(", "))
     }
 
+    fn get_shows(&self) -> Vec<&Show> {
+        self.shows.values().collect()
+    }
+
     fn get_current(&self) -> &Show {
         &self.shows[&self.current]
     }
 
-    fn update(&mut self, title: String, watch: i32, done: bool) {
-        self.shows.entry(title).and_modify(|e| {
-            e.watched += watch;
-            e.completed = done;
-        });
+    fn update(&mut self, title: String, watch: i32, length: Option<i32>, done: bool) {
+        match length {
+            Some(v) => {
+                self.shows.entry(title).and_modify(|e| {
+                    e.watched += watch;
+                    e.completed = done;
+                    e.length = v;
+                });
+            }
+            None => {
+                self.shows.entry(title).and_modify(|e| {
+                    e.watched += watch;
+                    e.completed = done;
+                });
+            }
+        }
     }
 }
 

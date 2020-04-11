@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 //hiding this in its own file cus its ugly
 pub fn get_matches<'a>() -> ArgMatches<'a> {
     App::new("Ipsos Watchlist Manager")
-        .version("0.0.1")
+        .version("0.1.0")
         .author("Emerald (https://discord.gg/KwzhFaK)")
         .about("Manage your watchlists with ease from the command line")
         .subcommand(
@@ -83,7 +83,7 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
             SubCommand::with_name("update")
                 .alias("up")
                 .about("Update a show in the watchlist")
-                .help("Running this command with no options will add 1 to the watched episode counter of the current show")
+                .after_help("Running this command with no options will add 1 to the watched episode counter of the current show")
                 .arg(Arg::with_name("TITLE").help(
                     "The title of the show to update. Will update the current show if omitted",
                 ))
@@ -100,7 +100,11 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                         .takes_value(true)
                         .long("watched")
                         .short("w")
-                )
+                ).arg(Arg::with_name("length")
+                        .help("How many episodes the show has")
+                        .takes_value(true)
+                        .long("length")
+                        .short("l"))
         ).subcommand(SubCommand::with_name("watch")
                 .alias("w")
                 .about("Watch a show from the watchlist")

@@ -1,6 +1,6 @@
 [package]
 name = "ipsos"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["AnActualEmerald <kevinliger13@gmail.com>"]
 edition = "2018"
 
