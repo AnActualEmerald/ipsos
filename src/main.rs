@@ -37,7 +37,7 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("add") {
         add_show(
-            matches.value_of("title"),
+            matches.value_of("TITLE"),
             matches.value_of("length"),
             matches.value_of("watched"),
             matches.is_present("done"),
@@ -344,4 +344,60 @@ struct Show {
     length: i32,
     watched: i32,
     completed: bool,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn json_functions() {
+        let path = PathBuf::from("./test2.json".to_owned());
+        let mut foo = MainList {
+            current: "none".to_owned(),
+            lists: HashMap::new(),
+        };
+
+        read_json(&path).expect("Well this is embarrasing");
+        //need to make sure the file exists first, and
+        //for whatever reason i've put that functionality in the read function
+
+        foo.lists.insert(
+            "test".to_owned(),
+            WatchList {
+                name: "test".to_owned(),
+                current: "none".to_owned(),
+                shows: HashMap::new(),
+            },
+        );
+        save_json(&foo, &path).expect("Well this is embarrasing");
+
+        if let Ok(bar) = read_json(&path) {
+            assert_eq!(foo.current, bar.current);
+            assert_eq!(foo.list(), bar.list());
+        }
+    }
+    #[test]
+    fn json_init() {
+        if let Ok(foo) = read_json(&PathBuf::from("./test.json".to_owned())) {
+            let bar = MainList {
+                current: "none".to_owned(),
+                lists: HashMap::new(),
+            };
+            assert_eq!(foo.current, bar.current);
+        }
+    }
+
+    #[test]
+    fn path_generation() {
+        let foo = gen_path();
+        let bar = PathBuf::from(format!(
+            "{}/.ipsos/lists.json",
+            dirs::home_dir().unwrap().display()
+        ));
+        assert_eq!(foo, bar);
+
+        assert_ne!(foo, PathBuf::from("/lists.json".to_owned()));
+    }
 }

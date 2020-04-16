@@ -49,9 +49,7 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                 .alias("a")
                 .about("Add a show to the watchlist")
                 .arg(
-                    Arg::with_name("title")
-                        .short("t")
-                        .long("title")
+                    Arg::with_name("TITLE")
                         .help("The title of the show to add")
                         .takes_value(true)
                         .required(true),
