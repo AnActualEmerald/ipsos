@@ -63,6 +63,9 @@ fn main() {
 mod tests {
 
 	use super::*;
+	use manager::*;
+	use std::collections::HashMap;
+	use std::path::PathBuf;
 
 	#[test]
 	fn json_functions() {

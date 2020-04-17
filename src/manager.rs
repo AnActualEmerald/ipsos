@@ -231,7 +231,7 @@ pub struct MainList {
 }
 
 impl MainList {
-	fn list(&self) -> String {
+	pub fn list(&self) -> String {
 		let mut res = vec![];
 		for (_, v) in self.lists.iter() {
 			res.push(v.name.as_str());
@@ -252,7 +252,7 @@ pub struct WatchList {
 }
 
 impl WatchList {
-	fn list(&self) -> String {
+	pub fn list(&self) -> String {
 		let mut res = vec![];
 		for (_, v) in self.shows.iter() {
 			res.push(v.title.as_str());
