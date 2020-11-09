@@ -1,8 +1,3 @@
-extern crate clap;
-extern crate dirs;
-extern crate serde;
-extern crate serde_json;
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -67,6 +62,8 @@ pub fn add_show(
 	let mut len_p: i32 = 0;
 	let mut watch_p: i32 = 0;
 	let title_p = title.unwrap_or("none").to_owned();
+
+	
 
 	if let Ok(v) = len.unwrap_or("0").parse::<i32>() {
 		len_p = v;
