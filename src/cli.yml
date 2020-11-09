@@ -1,0 +1,75 @@
+name: Ipsos Watchlist Manager
+version: "0.0.1"
+author: Emerald (https://discord.gg/KwzhFaK)
+about: Manage your watchlists with ease from the command line
+subcommands:
+    - list:
+          alias: l
+          about: Show the current watchlists
+          args:
+              - shows:
+                    short: s
+                    long: shows
+                    help: Display detailed information about the shows in the watchlist
+    - switch:
+          alias: s
+          about: Switch to an existing watchlist
+          args:
+              - NAME:
+                    help: Name of the watchlist to switch to
+                    required: true
+    - new:
+          alias: "n"
+          about: Create a new watchlist
+          args:
+              - NAME:
+                    help: Name of the new watchlist
+                    required: true
+              - switch:
+                    help: Switch to the watchlist after creating it
+                    short: s
+                    long: switch
+    - add:
+          alias: a
+          about: Add a show to the watchlist
+          args:
+              - title:
+                    help: Title of the show
+                    required: true
+              - length:
+                    help: How many episodes the show has
+                    long: len
+                    short: l
+                    takes_value: true
+              - watched:
+                    help: How many episodes you've already watched
+                    long: watched
+                    short: w
+                    takes_value: true
+                    requires: length
+              - done:
+                    help: Add this if you've already finished this show
+                    long: done
+                    short: d
+    - update:
+          alias: up
+          about: Update a show
+          args:
+              - TITLE:
+                    help: The title of the show to update. Updates the current show if omitted
+              - done:
+                    help: Whether or not you've finished the show
+                    long: done
+                    short: d
+              - watched:
+                    help: The number of episodes you've watched(Adds to the current total and can be negative)
+                    long: watched
+                    short: w
+                    takes_value: true
+    - watch:
+          alias: w
+          about: Watch a show from the current watchlist
+          args:
+              - Title:
+                    help: Title of the show to watch
+                    required: true

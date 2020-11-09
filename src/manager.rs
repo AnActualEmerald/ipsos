@@ -51,7 +51,7 @@ pub fn watch_show(title: &str) -> Result<(), Error> {
 	Ok(())
 }
 
-pub fn add_show(
+pub async fn add_show(
 	title: Option<&str>,
 	len: Option<&str>,
 	watched: Option<&str>,

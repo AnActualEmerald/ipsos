@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 //hiding this in its own file cus its ugly
 pub fn get_matches<'a>() -> ArgMatches<'a> {
 	App::new("Ipsos Watchlist Manager")
-        .version("0.1.0")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("Emerald (https://discord.gg/KwzhFaK)")
         .about("Manage your watchlists with ease from the command line")
         .subcommand(

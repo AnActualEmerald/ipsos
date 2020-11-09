@@ -9,8 +9,11 @@ edition = "2018"
 [dependencies]
 clap = "2.33.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0.117"
 serde_json = "1.0"
 dirs = "2.0.2"
 text_io = "0.1.8"
 myanimelist-rs = "0.1.0"
 oauth2 = "3.0.0"
+tokio = { version = "0.2", features = ["full"] }
+warp = "0.2"

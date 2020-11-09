@@ -1,12 +1,15 @@
-extern crate clap;
-extern crate dirs;
-extern crate serde;
-extern crate serde_json;
+use clap;
+use dirs;
+use serde;
+use serde_json;
 
 mod application;
 mod manager;
+mod mal;
+mod auth;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	let matches = application::get_matches();
 
 	if let Some(matches) = matches.subcommand_matches("list") {
@@ -38,7 +41,7 @@ fn main() {
 			matches.value_of("length"),
 			matches.value_of("watched"),
 			matches.is_present("done"),
-		)
+		).await
 		.expect("Couldn't add show");
 	}
 
