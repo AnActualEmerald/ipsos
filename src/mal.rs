@@ -22,36 +22,40 @@ pub fn search_show(title: &str) -> Option<Anime> {
 		fields: Some(ALL_ANIME_AND_MANGA_FIELDS.to_owned()),
 	};
 
-	let ret = anime::get_anime_list(q, auth: )
+	// let ret = anime::get_anime_list(q, auth: )
 
 	None
 }
 
+//Basically in order to have this work the way I wanted I would need to move most of the application to a daemon and just use the CLI to communicate with the daemon
+//this sounds like it would kind of suck and I honestly don't think it would be worth it, so I'll drop this idea for now, maybe I'll come back to it later
 async fn get_auth() -> Result</*StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>*/Auth, ParseError>{
 	//TODO: Figure out how authentication works
-	let redirect_url = "http://localhost/oauth";
+	let redirect_url = format!("http://localhost/{}/oauth", env::var("USER").unwrap());
 	let auth_url = "https://myanimelist.net/v1/oauth2/authorize";
 	let token_url = "https://myanimelist.net/v1/oauth2/token";
 	let client_id = include_str!("secret"); //if you cloned this repo you'll need to create this
 
-	// let mal_auth
+	let mut mal_auth = Auth::new("ipsos", client_id, None, redirect_url);
 
-	let auth_client = BasicClient::new(
-		ClientId::new(client_id.to_owned()),
-		None,
-		AuthUrl::new(
-			auth_url.to_owned())?,
-			Some(TokenUrl::new(token_url.to_owned())?),
+	// let auth_client = BasicClient::new(
+	// 	ClientId::new(client_id.to_owned()),
+	// 	None,
+	// 	AuthUrl::new(
+	// 		auth_url.to_owned())?,
+	// 		Some(TokenUrl::new(token_url.to_owned())?),
 		
-	)
-	.set_redirect_url(RedirectUrl::new(redirect_url.to_owned())?);
+	// )
+	// .set_redirect_url(RedirectUrl::new(redirect_url.to_owned())?);
 
-	let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+	// let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-	let (full_auth_url, csrf_token) = auth_client
-		.authorize_url(CsrfToken::new_random)
-		.set_pkce_challenge(pkce_challenge)
-		.url();
+	// let (full_auth_url, csrf_token) = auth_client
+	// 	.authorize_url(CsrfToken::new_random)
+	// 	.set_pkce_challenge(pkce_challenge)
+	// 	.url();
+
+	let full_auth_url = mal_auth.get_auth_url();
 
 	if let Err(_) = env::var("MAL_CODE"){
 		if let Err(_) = myanimelist_rs::auth::open_in_browser(&full_auth_url) {
@@ -61,22 +65,17 @@ async fn get_auth() -> Result</*StandardTokenResponse<EmptyExtraTokenFields, Bas
 
 	auth::listen_for_code().await;
 
-	let token_result = auth_client
-		.exchange_code(AuthorizationCode::new(
-			env::var("MAL_CODE").unwrap_or_else(|o| {
-				panic!("didn't find the environment variable MAL_CODE: {}", o)
-			})
-		))
-		// Set the PKCE code verifier.
-		.set_pkce_verifier(pkce_verifier)
-		.add_extra_param("grant_type", "authorization_code")
-		.request(http_client);
-	
-	match token_result{
-		Ok(t) => {
-			let a 
-			return Ok(t)
-		},
-		Err(e) => panic!("Invalid token: {}", e)
-	}
+
+	mal_auth.get_access_token();
+	Ok(mal_auth)
+	// let token_result = auth_client
+	// 	.exchange_code(AuthorizationCode::new(
+	// 		env::var("MAL_CODE").unwrap_or_else(|o| {
+	// 			panic!("didn't find the environment variable MAL_CODE: {}", o)
+	// 		})
+	// 	))
+	// 	// Set the PKCE code verifier.
+	// 	.set_pkce_verifier(pkce_verifier)
+	// 	.add_extra_param("grant_type", "authorization_code")
+	// 	.request(http_client);
 }

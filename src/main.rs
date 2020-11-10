@@ -61,6 +61,10 @@ async fn main() {
 	}
 }
 
+fn check_cfg() {
+	
+}
+
 //testing
 #[cfg(test)]
 mod tests {
