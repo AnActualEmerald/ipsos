@@ -9,13 +9,13 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
         .subcommand(
             SubCommand::with_name("list")
                 .alias("l")
-                .about("Show all the current watchlists")
+                .about("Show all the shows in the current watchlist")
                 .arg(
-                    Arg::with_name("shows")
-                        .short("s")
-                        .long("shows")
+                    Arg::with_name("lists")
+                        .short("l")
+                        .long("lists")
                         .takes_value(false)
-                        .help("Show detailed information on the shows in the watchlist"),
+                        .help("Lists the watchlists"),
                 ),
         )
         .subcommand(

@@ -1,20 +1,16 @@
-extern crate clap;
-extern crate dirs;
-extern crate serde;
-extern crate serde_json;
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{Error, Read, Write};
 use std::path::PathBuf;
+use prettytable::{Table, format};
 
 pub fn update_show(
 	title: Option<&str>,
 	watched: Option<&str>,
 	len: Option<&str>,
 	done: bool,
-) -> Result<(), Error> {
+) -> Result<(), String> {
 	let path = gen_path();
 	let mut ml = read_json(&path)?;
 
@@ -42,7 +38,7 @@ pub fn update_show(
 	Ok(())
 }
 
-pub fn watch_show(title: &str) -> Result<(), Error> {
+pub fn watch_show(title: &str) -> Result<(), String> {
 	let path = gen_path();
 	let mut ml = read_json(&path)?;
 
@@ -61,7 +57,7 @@ pub fn add_show(
 	len: Option<&str>,
 	watched: Option<&str>,
 	completed: bool,
-) -> Result<(), Error> {
+) -> Result<(), String> {
 	let path = gen_path();
 	let mut ml = read_json(&path)?;
 	let mut len_p: i32 = 0;
@@ -94,7 +90,7 @@ pub fn add_show(
 	Ok(())
 }
 
-pub fn load_list(name: &str) -> Result<(), Error> {
+pub fn load_list(name: &str) -> Result<(), String> {
 	let path = gen_path();
 	let mut ml = read_json(&path)?;
 	ml.current = name.to_owned();
@@ -103,50 +99,69 @@ pub fn load_list(name: &str) -> Result<(), Error> {
 	Ok(())
 }
 
-pub fn list_shows() -> Result<(), Error> {
+pub fn list_shows() -> Result<(), String> {
 	let ml = read_json(&gen_path())?;
-	let current = ml.get_current();
-	let s = current.get_current();
-	println!("Current Shows: ");
-	println!(
-		"\nCurrently Watching: \n\n   {}:\n       Watched: {}%({}/{})\n       Completed: {}\n",
-		s.title,
-		((s.watched as f32 / s.length as f32) * 100.0) as i32,
-		s.watched,
-		s.length,
-		s.completed
-	);
+	let current = ml.get_current()?;
+	let mut table = Table::new();
+	let format = format::FormatBuilder::new()
+		.column_separator('|')
+		.borders('|')
+		.padding(1, 1)
+		.separators(&[format::LinePosition::Top, format::LinePosition::Intern,format::LinePosition::Bottom], format::LineSeparator::new('-', '+', '+', '+'))
+		.separator(format::LinePosition::Title, format::LineSeparator::new('=', '+', '+', '+'))
+		.build();
+	table.set_format(format);
+	table.set_titles(row!["", "Title", "% watched", "(watched/length)"]);
+	if let Some(s) = current.get_current(){
+		// table.add_row(row![" > ", s.title, format!("{}%", ((s.watched as f32 / s.length as f32) * 100.0) as i32), format!("({}/{})", s.watched, s.length)]);
+		// println!(
+		// 	"\n*{}*:\n    Watched: {}%({}/{})\n    Completed: {}\n",
+		// 	s.title,
+		// 	((s.watched as f32 / s.length as f32) * 100.0) as i32,
+		// 	s.watched,
+		// 	s.length,
+		// 	s.completed
+		// );
+	}
+
 	current.shows.iter().for_each(|(_, v)| {
-		let res = format!(
-			"{}:\n    Watched: {}%({}/{})\n    Completed: {}",
-			v.title,
-			((v.watched as f32 / v.length as f32) * 100.0) as i32,
-			v.watched,
-			v.length,
-			v.completed
-		);
+		
+
+		// let res = format!(
+		// 	"{}:\n    Watched: {}%({}/{})\n    Completed: {}",
+		// 	v.title,
+		// 	((v.watched as f32 / v.length as f32) * 100.0) as i32,
+		// 	v.watched,
+		// 	v.length,
+		// 	v.completed
+		// );
 		if current.current == v.title {
 			// println!("\nCurrently watching:\n{}\n\n", res);
+			table.add_row(row![">", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
+
 		} else {
-			println!("{}\n", res);
+			// println!("{}\n", res);
+			table.add_row(row!["", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
 		}
 	});
+
+	table.printstd();
 
 	Ok(())
 }
 
-pub fn list_lists() -> Result<(), Error> {
+pub fn list_lists() -> Result<(), String> {
 	let ml = read_json(&gen_path())?;
 	println!(
 		"Current: {}\nShows: {}\n\nLists: {}",
 		ml.current,
-		ml.get_current().list(),
+		ml.get_current()?.list(),
 		ml.list()
 	);
 	Ok(())
 }
 
-pub fn new_watchlist(name: &str) -> Result<(), Error> {
+pub fn new_watchlist(name: &str) -> Result<(), String> {
 	let path = gen_path();
 	let mut list = read_json(&path)?;
 
@@ -168,17 +183,20 @@ pub fn new_watchlist(name: &str) -> Result<(), Error> {
 }
 
 //utility functions
-pub fn save_json(data: &MainList, path: &PathBuf) -> Result<(), Error> {
+pub fn save_json(data: &MainList, path: &PathBuf) -> Result<(), String> {
 	let mut op = OpenOptions::new();
 	let mut file = match op.write(true).truncate(true).open(&path) {
-		Err(e) => panic!("Couldn't open file {}: {:?}", path.display(), e),
+		Err(e) => return Err(format!("Couldn't open file {}: {:?}", path.display(), e)),
 		Ok(file) => file,
 	};
 
-	file.write_all(serde_json::to_string(&data).unwrap().as_bytes())
+	match file.write_all(serde_json::to_string(&data).unwrap().as_bytes()) {
+		Ok(_) => Ok(()),
+		Err(e) => return Err(format!("Couldn't write file {}: {:?}", path.display(), e))
+	}
 }
 
-pub fn read_json(path: &PathBuf) -> Result<MainList, Error> {
+pub fn read_json(path: &PathBuf) -> Result<MainList, String> {
 	let data: MainList;
 	let mut op = OpenOptions::new();
 
@@ -188,7 +206,7 @@ pub fn read_json(path: &PathBuf) -> Result<MainList, Error> {
 				std::fs::create_dir(PathBuf::from(format!(
 					"{}/.ipsos",
 					dirs::home_dir().unwrap().display()
-				)))?; //if the directory doesn't exist, create it and try again
+				))).unwrap(); //if the directory doesn't exist, create it and try again
 				return read_json(&path);
 			} else {
 				panic!("Couldn't open file {}: {:?}", path.display(), e) //if that isn't the issue, something else is wrong
@@ -199,8 +217,8 @@ pub fn read_json(path: &PathBuf) -> Result<MainList, Error> {
 
 	let mut raw: String = String::new();
 	if let Err(e) = file.read_to_string(&mut raw) {
-		panic!("Got this error when reading the file: {}", e);
-	};
+		return Err(format!("Got this error when reading the file: {}", e));
+	}
 	if raw == "{}/n" || raw == "" {
 		data = MainList {
 			current: "none".to_owned(),
@@ -239,8 +257,12 @@ impl MainList {
 		res.join(", ")
 	}
 
-	fn get_current(&self) -> &WatchList {
-		&self.lists[&self.current]
+	fn get_current(&self) -> Result<&WatchList, String> {
+		if self.lists.contains_key(&self.current) {
+			Ok(&self.lists[&self.current])
+		}else {
+			Err(format!("Couldn't find list {}", &self.current))
+		}
 	}
 }
 
@@ -264,8 +286,12 @@ impl WatchList {
 		self.shows.values().collect()
 	}
 
-	fn get_current(&self) -> &Show {
-		&self.shows[&self.current]
+	fn get_current(&self) -> Option<&Show> {
+		if self.shows.contains_key(&self.current) {
+			Some(&self.shows[&self.current])
+		}else {
+			None
+		}
 	}
 
 	fn update(&mut self, title: String, watch: i32, length: Option<i32>, done: bool) {

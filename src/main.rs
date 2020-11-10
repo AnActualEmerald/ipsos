@@ -6,14 +6,16 @@ extern crate serde_json;
 mod application;
 mod manager;
 
+#[macro_use] extern crate prettytable;
+
 fn main() {
 	let matches = application::get_matches();
 
 	if let Some(matches) = matches.subcommand_matches("list") {
-		if matches.is_present("shows") {
-			manager::list_shows().expect("Couldn't read file");
-		} else {
+		if matches.is_present("lists") {
 			manager::list_lists().expect("Couldn't read file");
+		} else {
+			manager::list_shows().expect("Couldn't read file");
 		}
 	}
 
