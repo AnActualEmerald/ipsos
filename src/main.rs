@@ -41,14 +41,15 @@ async fn main() {
 			if let Err(_e) = manager::add_show_imdb(matches.value_of("TITLE").unwrap()).await {
 				println!("Coudln't add that show");
 			}
+		}else{
+			manager::add_show(
+				matches.value_of("TITLE"),
+				matches.value_of("length"),
+				matches.value_of("watched"),
+				matches.is_present("done"),
+			)
+			.expect("Couldn't add show");
 		}
-		manager::add_show(
-			matches.value_of("TITLE"),
-			matches.value_of("length"),
-			matches.value_of("watched"),
-			matches.is_present("done"),
-		)
-		.expect("Couldn't add show");
 	}
 
 	if let Some(matches) = matches.subcommand_matches("watch") {
