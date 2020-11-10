@@ -5,6 +5,8 @@ use std::io::{Error, Read, Write};
 use std::path::PathBuf;
 use prettytable::{Table, format};
 
+use crate::imdb;
+
 pub fn update_show(
 	title: Option<&str>,
 	watched: Option<&str>,
@@ -50,6 +52,25 @@ pub fn watch_show(title: &str) -> Result<(), String> {
 
 	println!("Now watching {}", title);
 	Ok(())
+}
+
+pub async fn add_show_imdb(title: &str) -> Result<(), String>{
+	match imdb::get_show_data(title).await {
+		Some(show) => {
+			let path = gen_path();
+			let mut ml = read_json(&path)?;
+			ml.lists.entry(ml.current.clone()).and_modify(|e| {
+			// maybe too much copying but it shouldn't really matter
+				e.shows.insert(show.title.clone(), show.clone());
+			});
+
+			save_json(&ml, &path)?;
+
+			println!("Added show {} to watchlist {}", show.title, ml.current);
+			Ok(())
+		}
+		_ => Ok(())
+	}
 }
 
 pub fn add_show(
@@ -112,35 +133,23 @@ pub fn list_shows() -> Result<(), String> {
 		.build();
 	table.set_format(format);
 	table.set_titles(row!["", "Title", "% watched", "(watched/length)"]);
-	if let Some(s) = current.get_current(){
-		// table.add_row(row![" > ", s.title, format!("{}%", ((s.watched as f32 / s.length as f32) * 100.0) as i32), format!("({}/{})", s.watched, s.length)]);
-		// println!(
-		// 	"\n*{}*:\n    Watched: {}%({}/{})\n    Completed: {}\n",
-		// 	s.title,
-		// 	((s.watched as f32 / s.length as f32) * 100.0) as i32,
-		// 	s.watched,
-		// 	s.length,
-		// 	s.completed
-		// );
-	}
+	// if let Some(s) = current.get_current(){
+	// 	// table.add_row(row![" > ", s.title, format!("{}%", ((s.watched as f32 / s.length as f32) * 100.0) as i32), format!("({}/{})", s.watched, s.length)]);
+	// 	// println!(
+	// 	// 	"\n*{}*:\n    Watched: {}%({}/{})\n    Completed: {}\n",
+	// 	// 	s.title,
+	// 	// 	((s.watched as f32 / s.length as f32) * 100.0) as i32,
+	// 	// 	s.watched,
+	// 	// 	s.length,
+	// 	// 	s.completed
+	// 	// );
+	// }
 
 	current.shows.iter().for_each(|(_, v)| {
-		
-
-		// let res = format!(
-		// 	"{}:\n    Watched: {}%({}/{})\n    Completed: {}",
-		// 	v.title,
-		// 	((v.watched as f32 / v.length as f32) * 100.0) as i32,
-		// 	v.watched,
-		// 	v.length,
-		// 	v.completed
-		// );
 		if current.current == v.title {
-			// println!("\nCurrently watching:\n{}\n\n", res);
 			table.add_row(row![">", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
 
 		} else {
-			// println!("{}\n", res);
 			table.add_row(row!["", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
 		}
 	});
@@ -313,7 +322,7 @@ impl WatchList {
 	}
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Show {
 	pub title: String,
 	pub length: i32,

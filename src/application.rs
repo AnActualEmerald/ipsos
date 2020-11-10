@@ -48,6 +48,12 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
             SubCommand::with_name("add")
                 .alias("a")
                 .about("Add a show to the watchlist")
+                .arg(Arg::with_name("imdb")
+                    .help("Search IMDb for a show")
+                    .short("i")
+                    .long("imdb")
+                    .takes_value(false),
+                )
                 .arg(
                     Arg::with_name("TITLE")
                         .help("The title of the show to add")

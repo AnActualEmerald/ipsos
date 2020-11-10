@@ -16,3 +16,5 @@ prettytable-rs = "^0.8"
 reqwest = { version = "0.10", features = ["json"] }
 tokio = { version = "0.2", features = ["full"] }
 rustyline = "6.3.0"
+term = "0.4.6"
+futures = "0.3.7"

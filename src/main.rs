@@ -5,10 +5,12 @@ extern crate serde_json;
 
 mod application;
 mod manager;
+mod imdb;
 
 #[macro_use] extern crate prettytable;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	let matches = application::get_matches();
 
 	if let Some(matches) = matches.subcommand_matches("list") {
@@ -35,6 +37,11 @@ fn main() {
 	}
 
 	if let Some(matches) = matches.subcommand_matches("add") {
+		if matches.is_present("imdb"){
+			if let Err(_e) = manager::add_show_imdb(matches.value_of("TITLE").unwrap()).await {
+				println!("Coudln't add that show");
+			}
+		}
 		manager::add_show(
 			matches.value_of("TITLE"),
 			matches.value_of("length"),
