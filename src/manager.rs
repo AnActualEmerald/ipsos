@@ -4,6 +4,7 @@ use std::fs::OpenOptions;
 use std::io::{Error, Read, Write};
 use std::path::PathBuf;
 use prettytable::{Table, format};
+use std::process::Command;
 use toml;
 
 use crate::imdb;
@@ -115,16 +116,28 @@ pub fn add_show(
 pub fn remove_list(name: &str) -> Result<bool, String> {
 	let path = gen_path();
 	let mut cfg = read_config();
-	std::fs::remove_file(path).expect(&format!("Unable to remove file {}", name));
+	if let Some(p) = cfg.lists.iter().position(|v| v == name){
+		cfg.lists.remove(p);
 
-	if cfg.current_list.unwrap() == name {
-		cfg.current_list = Some("general".to_owned());
-		Ok(true)
-	}else {
+		if let Err(e) = Command::new("rm").arg(path.as_os_str()).output() {
+			return Err(format!("Unable to remove file: {}", e));
+		}
+
+		
+		if Some(name.to_owned()) == cfg.current_list {
+			cfg.current_list = Some("general".to_owned());
+			save_config(&cfg);
+			return Ok(true)
+		}
+
+		save_config(&cfg);
 		Ok(false)
-	}
-
 	
+	} else {
+	
+		Err("Couldn't find list to remove".to_owned())
+
+	}
 }
 
 pub fn remove_show(title: &str) -> Result<(), String> {
