@@ -48,9 +48,10 @@ pub fn watch_show(title: &str) -> Result<(), String> {
 
 pub async fn add_show_imdb(title: &str) -> Result<(), String>{
 	match imdb::get_show_data(title).await {
-		Some(show) => {
+		Some(mut show) => {
 			let path = gen_path();
 			let mut wl = read_json(&path)?;
+			show.id = (wl.shows.len() + 1) as i32;
 			wl.shows.insert(show.title.clone(), show.clone());
 
 			save_json(&wl, &path)?;
@@ -78,6 +79,7 @@ pub fn add_show(
 	}
 
 	let show = Show {
+		id: (wl.shows.len() + 1) as i32,
 		title: String::from(&title_p),
 		runtime: len_p,
 		completed,
@@ -92,6 +94,19 @@ pub fn add_show(
 
 	println!("Added show {} to watchlist {}", title_p, wl.name);
 	Ok(())
+}
+
+pub fn remove_show(title: &str) -> Result<(), String> {
+	let path = gen_path();
+	let mut wl = read_json(&path)?;
+	wl.shows.remove(title);
+
+	save_json(&wl, &path);
+	Ok(())
+}
+
+pub fn remove_show_id() {
+	//need to implement ID's first
 }
 
 pub fn load_list(name: &str) -> Result<(), String> {
@@ -112,17 +127,26 @@ pub fn list_shows() -> Result<(), String> {
 		.separator(format::LinePosition::Title, format::LineSeparator::new('=', '+', '+', '+'))
 		.build();
 	table.set_format(format);
-	table.set_titles(row!["", "Title", "Runtime", "Completed"]);
+	table.set_titles(row!["", "ID", "Title", "Runtime", "Done"]);
 
+	let mut sort: Vec<(&String, &Show)>= current.shows.iter().collect();
 
-	current.shows.iter().for_each(|(_, v)| {
+	sort.sort_by(|a, b| {
+		a.1.id.cmp(&b.1.id)
+	});
+
+	sort.iter().for_each(|(_, v)| {
 		if current.current == v.title {
-			table.add_row(row![">", v.title, v.runtime, v.completed]);
+			table.add_row(row![">", v.id, v.title, v.runtime, v.completed]);
 
 		} else {
-			table.add_row(row!["", v.title, v.runtime, v.completed]);
+			table.add_row(row!["", v.id, v.title, v.runtime, v.completed]);
 		}
 	});
+
+	if current.shows.len() == 0 {
+		table.add_row(row!["", "", "", "", ""]);
+	}
 
 	table.printstd();
 
@@ -146,12 +170,13 @@ pub fn list_lists() -> Result<(), String> {
 }
 
 pub fn new_watchlist(name: &str) -> Result<(), String> {
-	let cfg = read_config();
+	let mut cfg = read_config();
 	
 	
 
 	//add the provided watchlist name to the list of lists
-	
+	cfg.lists.push(name.to_string());
+	save_config(&cfg);
 
 	println!("Created watchlist {}", name);
 
@@ -354,6 +379,7 @@ impl WatchList {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Show {
+	pub id: i32,
 	pub title: String,
 	pub runtime: String,
 	pub completed: bool,

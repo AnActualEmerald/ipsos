@@ -39,6 +39,7 @@ pub fn get_show_data(title: &str) -> BoxFuture<'_, Option<Show>>{
                     _ => { //the default is yes, so everything goes here
                         t.reset();
                         Some(Show {
+                            id: 0,
                             title: res.title,
                             runtime: get_runtime(res.id).await.unwrap(),
                             completed: false,
@@ -65,14 +66,16 @@ async fn get_runtime(id: String) -> Result<String, reqwest::Error> {
     let response = reqwest::get(&req).await?.json::<std::collections::HashMap<String, serde_json::Value>>().await?;
 
 
-    Ok(response.get("runtimeStr").unwrap_or(&serde_json::Value::Null).clone().to_string())
+    Ok(response.get("runtimeStr").unwrap_or(&serde_json::Value::Null).clone().to_string().replace("\"", ""))
 
 }
 
 async fn search_show(title: &str) -> Result<SearchResult, reqwest::Error> {
-    let request = format!("https://imdb-api.com/en/API/SearchTitle/{}/{}", SECRET, title);
+    let request = format!("https://imdb-api.com/en/API/SearchTitle/{}/{}", SECRET, title);    
     let response: SearchData = reqwest::get(&request).await?.json().await?; 
     Ok(response.results[0].clone())
+
+
 }
 
 #[derive(Deserialize, Clone)]

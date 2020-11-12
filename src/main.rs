@@ -38,12 +38,12 @@ async fn main() {
 
 	if let Some(matches) = matches.subcommand_matches("add") {
 		if matches.is_present("imdb"){
-			if let Err(_e) = manager::add_show_imdb(matches.value_of("TITLE").unwrap()).await {
+			if let Err(_e) = manager::add_show_imdb(&matches.values_of("TITLE").unwrap().collect::<String>()).await {
 				println!("Coudln't add that show");
 			}
 		}else{
 			manager::add_show(
-				matches.value_of("TITLE"),
+				Some(&matches.values_of("TITLE").unwrap().collect::<String>()),
 				matches.value_of("length"),
 				matches.value_of("watched"),
 				matches.is_present("done"),
@@ -64,6 +64,20 @@ async fn main() {
 			matches.is_present("done"),
 		)
 		.expect("Couldn't update the show");
+	}
+
+	if let Some(matches) = matches.subcommand_matches("remove") {
+		let id = matches.value_of("ID");
+		if let Some(tmp) = id {
+			manager::remove_show_id();
+		}else {
+			if let Some(title) = matches.value_of("title") {
+				manager::remove_show(title);
+				println!("Removed show {}", title);
+			}else {
+				println!("Need a title or ID");
+			}
+		}
 	}
 }
 
