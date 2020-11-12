@@ -4,52 +4,76 @@ use std::fs::OpenOptions;
 use std::io::{Error, Read, Write};
 use std::path::PathBuf;
 use prettytable::{Table, format};
+use std::process::Command;
+use toml;
+
+use crate::imdb;
 
 pub fn update_show(
 	title: Option<&str>,
-	watched: Option<&str>,
 	len: Option<&str>,
 	done: bool,
 ) -> Result<(), String> {
 	let path = gen_path();
-	let mut ml = read_json(&path)?;
+	let mut wl = read_json(&path)?;
 
-	ml.lists.entry(ml.current.clone()).and_modify(|v| {
-		let title_p = title.unwrap_or_else(|| v.current.as_str());
-		let watch_p = if let Ok(i) = watched.unwrap_or("1").parse::<i32>() {
-			i
+	let title_p = title.unwrap_or_else(|| wl.current.as_str());
+	let len_p = if let Some(tmp) = len {
+			Some(tmp.to_owned())
 		} else {
-			1
+			None
 		};
-		let len_p = len.and_then(|i| {
-			if let Ok(e) = i.parse::<i32>() {
-				Some(e)
-			} else {
-				None
-			}
-		});
-		v.update(String::from(title_p), watch_p, len_p, done);
-	});
+	wl.update(String::from(title_p), len_p, done);
 
-	save_json(&ml, &path)?;
+
+	save_json(&wl, &path)?;
 
 	println!("Updated show");
 
 	Ok(())
 }
 
-pub fn watch_show(title: &str) -> Result<(), String> {
+pub fn watch_show(id: &str) -> Result<(), String> {
 	let path = gen_path();
-	let mut ml = read_json(&path)?;
+	let mut wl = read_json(&path)?;
+	let mut show = &String::new();
+	
+	for (k, v) in wl.shows.iter() {
+		if Ok(v.id) == id.parse::<i32>() {
+			show = k;
+			break;
+		}else {
+			continue;
+		}
+	}
 
-	ml.lists.entry(ml.current.clone()).and_modify(|v| {
-		v.current = title.to_owned();
-	});
+	wl.current = show.clone();
 
-	save_json(&ml, &path)?;
+	save_json(&wl, &path)?;
 
-	println!("Now watching {}", title);
+	println!("Now watching {}", show);
 	Ok(())
+}
+
+pub async fn add_show_imdb(title: &str) -> Result<(), String>{
+	match imdb::get_show_data(title).await {
+		Some(mut show) => {
+			let path = gen_path();
+			let mut wl = read_json(&path)?;
+			let mut cfg = read_config();
+			cfg.id += 1;
+			save_config(&cfg);
+	
+			show.id = cfg.id;
+			wl.shows.insert(show.title.clone(), show.clone());
+
+			save_json(&wl, &path)?;
+
+			println!("Added show {} to watchlist {}", show.title, wl.name);
+			Ok(())
+		}
+		_ => Ok(())
+	}
 }
 
 pub fn add_show(
@@ -59,49 +83,104 @@ pub fn add_show(
 	completed: bool,
 ) -> Result<(), String> {
 	let path = gen_path();
-	let mut ml = read_json(&path)?;
-	let mut len_p: i32 = 0;
-	let mut watch_p: i32 = 0;
+	let mut wl = read_json(&path)?;
+	let mut cfg = read_config();
+	let mut len_p = String::new();
 	let title_p = title.unwrap_or("none").to_owned();
 
-	if let Ok(v) = len.unwrap_or("0").parse::<i32>() {
-		len_p = v;
+	cfg.id += 1;
+	save_config(&cfg);
+	
+	if let Some(v) = len{
+		len_p = v.to_owned();
 	}
-
-	if let Ok(v) = watched.unwrap_or("0").parse::<i32>() {
-		watch_p = v;
-	}
-
+	
 	let show = Show {
+		id: cfg.id,
 		title: String::from(&title_p),
-		length: len_p,
-		watched: watch_p,
+		runtime: len_p,
 		completed,
 	};
 
-	ml.lists.entry(ml.current.clone()).and_modify(|e| {
+	
 		// maybe too much copying but it shouldn't really matter
-		e.shows.insert(show.title.clone(), show);
-	});
+	wl.shows.insert(show.title.clone(), show);
+	
 
-	save_json(&ml, &path)?;
+	save_json(&wl, &path)?;
 
-	println!("Added show {} to watchlist {}", title_p, ml.current);
+	println!("Added show {} to watchlist {}", title_p, wl.name);
 	Ok(())
 }
 
-pub fn load_list(name: &str) -> Result<(), String> {
+pub fn remove_list(name: &str) -> Result<bool, String> {
 	let path = gen_path();
-	let mut ml = read_json(&path)?;
-	ml.current = name.to_owned();
-	save_json(&ml, &path)?;
+	let mut cfg = read_config();
+	if let Some(p) = cfg.lists.iter().position(|v| v == name){
+		cfg.lists.remove(p);
+
+		if let Err(e) = Command::new("rm").arg(path.as_os_str()).output() {
+			return Err(format!("Unable to remove file: {}", e));
+		}
+
+		
+		if Some(name.to_owned()) == cfg.current_list {
+			cfg.current_list = Some("general".to_owned());
+			save_config(&cfg);
+			return Ok(true)
+		}
+
+		save_config(&cfg);
+		Ok(false)
+	
+	} else {
+	
+		Err("Couldn't find list to remove".to_owned())
+
+	}
+}
+
+pub fn remove_show(title: &str) -> Result<(), String> {
+	let path = gen_path();
+	let mut wl = read_json(&path)?;
+	wl.shows.remove(title);
+
+	save_json(&wl, &path);
+	Ok(())
+}
+
+pub fn remove_show_id(id: &str) -> Result<String, String>{
+	let path = gen_path();
+	let mut wl = read_json(&path)?;
+	let mut show = None;
+	for (k, v) in wl.shows.iter() {
+		if Ok(v.id) == id.parse::<i32>() {
+			show = Some(k.clone());
+			break;
+		}else {
+			continue;
+		}
+	}
+
+	if let Some(s) = show {
+		wl.shows.remove(&s);
+		save_json(&wl, &path);
+		Ok(s)
+	}else {
+		Err(String::from("Couldn't find show to delete"))
+	}
+}
+
+pub fn load_list(name: &str) -> Result<(), String> {
+	let mut cfg = read_config();
+	cfg.current_list = Some(name.to_owned()); // add the name to the list of lists in the config file
 	println!("Switched to list {}", name);
+	save_config(&cfg);
 	Ok(())
 }
 
 pub fn list_shows() -> Result<(), String> {
-	let ml = read_json(&gen_path())?;
-	let current = ml.get_current()?;
+	let current = read_json(&gen_path())?;
 	let mut table = Table::new();
 	let format = format::FormatBuilder::new()
 		.column_separator('|')
@@ -111,39 +190,26 @@ pub fn list_shows() -> Result<(), String> {
 		.separator(format::LinePosition::Title, format::LineSeparator::new('=', '+', '+', '+'))
 		.build();
 	table.set_format(format);
-	table.set_titles(row!["", "Title", "% watched", "(watched/length)"]);
-	if let Some(s) = current.get_current(){
-		// table.add_row(row![" > ", s.title, format!("{}%", ((s.watched as f32 / s.length as f32) * 100.0) as i32), format!("({}/{})", s.watched, s.length)]);
-		// println!(
-		// 	"\n*{}*:\n    Watched: {}%({}/{})\n    Completed: {}\n",
-		// 	s.title,
-		// 	((s.watched as f32 / s.length as f32) * 100.0) as i32,
-		// 	s.watched,
-		// 	s.length,
-		// 	s.completed
-		// );
-	}
+	table.set_titles(row!["", "ID", "Title", "Runtime", "Done"]);
 
-	current.shows.iter().for_each(|(_, v)| {
-		
+	let mut sort: Vec<(&String, &Show)>= current.shows.iter().collect();
 
-		// let res = format!(
-		// 	"{}:\n    Watched: {}%({}/{})\n    Completed: {}",
-		// 	v.title,
-		// 	((v.watched as f32 / v.length as f32) * 100.0) as i32,
-		// 	v.watched,
-		// 	v.length,
-		// 	v.completed
-		// );
+	sort.sort_by(|a, b| {
+		a.1.id.cmp(&b.1.id)
+	});
+
+	sort.iter().for_each(|(_, v)| {
 		if current.current == v.title {
-			// println!("\nCurrently watching:\n{}\n\n", res);
-			table.add_row(row![">", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
+			table.add_row(row![">", v.id, v.title, v.runtime, v.completed]);
 
 		} else {
-			// println!("{}\n", res);
-			table.add_row(row!["", v.title, format!("{}%", ((v.watched as f32 / v.length as f32) * 100.0) as i32), format!("({}/{})", v.watched, v.length)]);
+			table.add_row(row!["", v.id, v.title, v.runtime, v.completed]);
 		}
 	});
+
+	if current.shows.len() == 0 {
+		table.add_row(row!["", "", "", "", ""]);
+	}
 
 	table.printstd();
 
@@ -151,31 +217,29 @@ pub fn list_shows() -> Result<(), String> {
 }
 
 pub fn list_lists() -> Result<(), String> {
-	let ml = read_json(&gen_path())?;
+	let wl = read_json(&gen_path())?;
+	let cfg = read_config();
+	// let lists = match cfg.lists {
+	// 	Some(l) => l,
+	// 	None => vec![]
+	// };
 	println!(
 		"Current: {}\nShows: {}\n\nLists: {}",
-		ml.current,
-		ml.get_current()?.list(),
-		ml.list()
+		cfg.current_list.unwrap(),
+		wl.list(),
+		cfg.lists.join(", ")
 	);
 	Ok(())
 }
 
 pub fn new_watchlist(name: &str) -> Result<(), String> {
-	let path = gen_path();
-	let mut list = read_json(&path)?;
+	let mut cfg = read_config();
+	
+	
 
 	//add the provided watchlist name to the list of lists
-	list.lists.insert(
-		String::from(name),
-		WatchList {
-			name: String::from(name),
-			current: "none".to_owned(),
-			shows: HashMap::new(),
-		},
-	);
-
-	save_json(&list, &path)?;
+	cfg.lists.push(name.to_string());
+	save_config(&cfg);
 
 	println!("Created watchlist {}", name);
 
@@ -183,7 +247,7 @@ pub fn new_watchlist(name: &str) -> Result<(), String> {
 }
 
 //utility functions
-pub fn save_json(data: &MainList, path: &PathBuf) -> Result<(), String> {
+pub fn save_json(data: &WatchList, path: &PathBuf) -> Result<(), String> {
 	let mut op = OpenOptions::new();
 	let mut file = match op.write(true).truncate(true).open(&path) {
 		Err(e) => return Err(format!("Couldn't open file {}: {:?}", path.display(), e)),
@@ -196,8 +260,8 @@ pub fn save_json(data: &MainList, path: &PathBuf) -> Result<(), String> {
 	}
 }
 
-pub fn read_json(path: &PathBuf) -> Result<MainList, String> {
-	let data: MainList;
+pub fn read_json(path: &PathBuf) -> Result<WatchList, String> {
+	let data: WatchList;
 	let mut op = OpenOptions::new();
 
 	let mut file = match op.read(true).write(true).create(true).open(&path) {
@@ -220,12 +284,13 @@ pub fn read_json(path: &PathBuf) -> Result<MainList, String> {
 		return Err(format!("Got this error when reading the file: {}", e));
 	}
 	if raw == "{}/n" || raw == "" {
-		data = MainList {
+		data = WatchList {
+			name: "general".to_owned(),
 			current: "none".to_owned(),
-			lists: HashMap::new(),
+			shows: HashMap::new(),
 		};
 	} else {
-		let res: Result<MainList, serde_json::Error> = serde_json::from_str(raw.as_str());
+		let res: Result<WatchList, serde_json::Error> = serde_json::from_str(raw.as_str());
 
 		data = match res {
 			Err(e) => panic!("Got this error when trying to deserialize json: {}", e),
@@ -236,8 +301,74 @@ pub fn read_json(path: &PathBuf) -> Result<MainList, String> {
 	Ok(data)
 }
 
+pub fn save_config(cfg: &Config) -> Result<(), String>{
+	let mut op = OpenOptions::new();
+	if let Some(mut path) = dirs::config_dir(){
+		path.push("ipsos/config.toml");
+		let mut file = match op.write(true).truncate(true).open(&path) {
+			Err(e) => return Err(format!("Couldn't open file {}: {:?}", path.display(), e)),
+			Ok(file) => file,
+		};
+
+		match file.write_all(toml::to_string(&cfg).unwrap().as_bytes()) {
+			Ok(_) => return Ok(()),
+			Err(e) => return Err(format!("Couldn't write file {}: {:?}", path.display(), e))
+		}
+	}
+
+	Ok(())
+}
+
+pub fn read_config() -> Config {
+	if let Some(mut dir) = dirs::config_dir(){
+		dir.push("ipsos");
+		if std::fs::read_dir(&dir).is_err() {
+			std::fs::create_dir(PathBuf::from(format!(
+				"{}/ipsos",
+				dirs::config_dir().unwrap().display()
+			))).unwrap(); //if the directory doesn't exist, create it and try again
+			save_config(&Config{
+				current_list: Some("general".to_string()),
+				lists: vec![],
+				id: 0,
+			}).expect("Unable to write config file");
+			return read_config();
+		}else {
+			dir.push("config.toml");
+		}
+		let mut op = OpenOptions::new();
+		let mut file = match op.read(true).write(true).create(true).open(&dir) {
+			Err(e) => {
+					panic!("Couldn't open file {}: {:?}", dir.display(), e) //if that isn't the issue, something else is wrong
+			}
+			Ok(file) => file,
+		};
+
+		let mut buf = String::new();
+		file.read_to_string(&mut buf);
+		if buf == String::new() {
+			buf = String::from(r#"
+				current_list = "general"
+				lists = []
+				id = 0
+			"#);
+		}
+
+
+		let config: Config = toml::from_str(&buf).unwrap_or_else(|e| panic!("{}", e));
+		return config;
+	}else {
+		panic!("Can't access config directory");
+	}
+}
+
 pub fn gen_path() -> PathBuf {
-	let r_path = format!("{}/.ipsos/lists.json", dirs::home_dir().unwrap().display()); //I want this to be in the user's home directory
+	let mut config = read_config();
+	if config.current_list == None{
+		config.current_list = Some("general".to_string());
+		save_config(&config);
+	}
+	let r_path = format!("{}/.ipsos/{}.json", dirs::home_dir().unwrap().display(), config.current_list.unwrap());
 	PathBuf::from(r_path)
 }
 
@@ -294,18 +425,16 @@ impl WatchList {
 		}
 	}
 
-	fn update(&mut self, title: String, watch: i32, length: Option<i32>, done: bool) {
+	fn update(&mut self, title: String, length: Option<String>, done: bool) {
 		match length {
 			Some(v) => {
 				self.shows.entry(title).and_modify(|e| {
-					e.watched += watch;
 					e.completed = done;
-					e.length = v;
+					e.runtime = v;
 				});
 			}
 			None => {
 				self.shows.entry(title).and_modify(|e| {
-					e.watched += watch;
 					e.completed = done;
 				});
 			}
@@ -313,10 +442,17 @@ impl WatchList {
 	}
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Show {
+	pub id: i32,
 	pub title: String,
-	pub length: i32,
-	pub watched: i32,
+	pub runtime: String,
 	pub completed: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Config{
+	pub current_list: Option<String>,
+	pub lists: Vec<String>,
+	pub id: i32
 }

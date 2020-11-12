@@ -5,10 +5,12 @@ extern crate serde_json;
 
 mod application;
 mod manager;
+mod imdb;
 
 #[macro_use] extern crate prettytable;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	let matches = application::get_matches();
 
 	if let Some(matches) = matches.subcommand_matches("list") {
@@ -29,34 +31,68 @@ fn main() {
 	}
 
 	if let Some(matches) = matches.subcommand_matches("switch") {
-		let name = matches.value_of("NAME").unwrap_or("generic");
+		let name = matches.value_of("NAME").unwrap_or("general");
 		manager::load_list(name)
 			.unwrap_or_else(|_| panic!("Couldn't switch to watchlist {}", name));
 	}
 
 	if let Some(matches) = matches.subcommand_matches("add") {
-		manager::add_show(
-			matches.value_of("TITLE"),
-			matches.value_of("length"),
-			matches.value_of("watched"),
-			matches.is_present("done"),
-		)
-		.expect("Couldn't add show");
+		if matches.is_present("imdb"){
+			if let Err(_e) = manager::add_show_imdb(&matches.values_of("TITLE").unwrap().collect::<String>()).await {
+				println!("Coudln't add that show");
+			}
+		}else{
+			manager::add_show(
+				Some(&matches.values_of("TITLE").unwrap().collect::<String>()),
+				matches.value_of("length"),
+				matches.value_of("watched"),
+				matches.is_present("done"),
+			)
+			.expect("Couldn't add show");
+		}
 	}
 
 	if let Some(matches) = matches.subcommand_matches("watch") {
-		manager::watch_show(matches.value_of("TITLE").unwrap_or("none"))
+		manager::watch_show(matches.value_of("ID").unwrap_or("none"))
 			.expect("Couldn't watch the show");
 	}
 
 	if let Some(matches) = matches.subcommand_matches("update") {
 		manager::update_show(
 			matches.value_of("TITLE"),
-			matches.value_of("watched"),
 			matches.value_of("length"),
 			matches.is_present("done"),
 		)
 		.expect("Couldn't update the show");
+	}
+
+	if let Some(matches) = matches.subcommand_matches("remove") {
+		let id = matches.value_of("ID");
+		if let Some(tmp) = id {
+			match manager::remove_show_id(tmp) {
+				Ok(s) => println!("Removed show {}", s),
+				Err(e) => println!("Coudln't remove show at id {}: {}", id.unwrap(), e)
+			}
+		}else {
+			if let Some(title) = matches.value_of("title") {
+				manager::remove_show(title);
+				println!("Removed show {}", title);
+			}else {
+				println!("Need a title or ID");
+			}
+		}
+	}
+
+	if let Some(matches) = matches.subcommand_matches("delete") {
+		let list = matches.value_of("NAME");
+		match manager::remove_list(list.unwrap()){
+			Ok(b) => if b {
+				println!("Removed list {}, switched back to the general list", list.unwrap());
+			} else {
+				println!("Removed list {}", list.unwrap());
+			}
+			Err(e) => println!("Unable to remove list: {}", e)
+		}
 	}
 }
 
@@ -72,23 +108,19 @@ mod tests {
 	#[test]
 	fn json_functions() {
 		let path = PathBuf::from("./test2.json".to_owned());
-		let mut foo = MainList {
-			current: "none".to_owned(),
-			lists: HashMap::new(),
-		};
+
 
 		read_json(&path).expect("Well this is embarrasing");
 		//need to make sure the file exists first, and
 		//for whatever reason i've put that functionality in the read function
 
-		foo.lists.insert(
-			"test".to_owned(),
-			WatchList {
+
+		let foo = WatchList {
 				name: "test".to_owned(),
 				current: "none".to_owned(),
 				shows: HashMap::new(),
-			},
-		);
+			};
+
 		save_json(&foo, &path).expect("Well this is embarrasing");
 
 		if let Ok(bar) = read_json(&path) {
@@ -109,9 +141,10 @@ mod tests {
 
 	#[test]
 	fn path_generation() {
+		//this might fail on my local machine beacues the config file will likely be edited
 		let foo = gen_path();
 		let bar = PathBuf::from(format!(
-			"{}/.ipsos/lists.json",
+			"{}/.ipsos/general.json",
 			dirs::home_dir().unwrap().display()
 		));
 		assert_eq!(foo, bar);
