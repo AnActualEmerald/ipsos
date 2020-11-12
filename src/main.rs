@@ -69,7 +69,10 @@ async fn main() {
 	if let Some(matches) = matches.subcommand_matches("remove") {
 		let id = matches.value_of("ID");
 		if let Some(tmp) = id {
-			manager::remove_show_id();
+			match manager::remove_show_id(tmp) {
+				Ok(s) => println!("Removed show {}", s),
+				Err(e) => println!("Coudln't remove show at id {}: {}", id.unwrap(), e)
+			}
 		}else {
 			if let Some(title) = matches.value_of("title") {
 				manager::remove_show(title);

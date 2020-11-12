@@ -51,7 +51,11 @@ pub async fn add_show_imdb(title: &str) -> Result<(), String>{
 		Some(mut show) => {
 			let path = gen_path();
 			let mut wl = read_json(&path)?;
-			show.id = (wl.shows.len() + 1) as i32;
+			let mut cfg = read_config();
+			cfg.id += 1;
+			save_config(&cfg);
+	
+			show.id = cfg.id;
 			wl.shows.insert(show.title.clone(), show.clone());
 
 			save_json(&wl, &path)?;
@@ -71,15 +75,19 @@ pub fn add_show(
 ) -> Result<(), String> {
 	let path = gen_path();
 	let mut wl = read_json(&path)?;
+	let mut cfg = read_config();
 	let mut len_p = String::new();
 	let title_p = title.unwrap_or("none").to_owned();
 
+	cfg.id += 1;
+	save_config(&cfg);
+	
 	if let Some(v) = len{
 		len_p = v.to_owned();
 	}
-
+	
 	let show = Show {
-		id: (wl.shows.len() + 1) as i32,
+		id: cfg.id,
 		title: String::from(&title_p),
 		runtime: len_p,
 		completed,
@@ -105,8 +113,27 @@ pub fn remove_show(title: &str) -> Result<(), String> {
 	Ok(())
 }
 
-pub fn remove_show_id() {
+pub fn remove_show_id(id: &str) -> Result<String, String>{
 	//need to implement ID's first
+	let path = gen_path();
+	let mut wl = read_json(&path)?;
+	let mut show = None;
+	for (k, v) in wl.shows.iter() {
+		if Ok(v.id) == id.parse::<i32>() {
+			show = Some(k.clone());
+			break;
+		}else {
+			continue;
+		}
+	}
+
+	if let Some(s) = show {
+		wl.shows.remove(&s);
+		save_json(&wl, &path);
+		Ok(s)
+	}else {
+		Err(String::from("Couldn't find show to delete"))
+	}
 }
 
 pub fn load_list(name: &str) -> Result<(), String> {
@@ -266,7 +293,8 @@ pub fn read_config() -> Config {
 			))).unwrap(); //if the directory doesn't exist, create it and try again
 			save_config(&Config{
 				current_list: Some("general".to_string()),
-				lists: vec![]
+				lists: vec![],
+				id: 0,
 			}).expect("Unable to write config file");
 			return read_config();
 		}else {
@@ -286,6 +314,7 @@ pub fn read_config() -> Config {
 			buf = String::from(r#"
 				current_list = "general"
 				lists = []
+				id = 0
 			"#);
 		}
 
@@ -389,4 +418,5 @@ pub struct Show {
 pub struct Config{
 	pub current_list: Option<String>,
 	pub lists: Vec<String>,
+	pub id: i32
 }
