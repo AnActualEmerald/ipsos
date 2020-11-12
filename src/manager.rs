@@ -32,17 +32,25 @@ pub fn update_show(
 	Ok(())
 }
 
-pub fn watch_show(title: &str) -> Result<(), String> {
+pub fn watch_show(id: &str) -> Result<(), String> {
 	let path = gen_path();
 	let mut wl = read_json(&path)?;
+	let mut show = &String::new();
+	
+	for (k, v) in wl.shows.iter() {
+		if Ok(v.id) == id.parse::<i32>() {
+			show = k;
+			break;
+		}else {
+			continue;
+		}
+	}
 
-	
-	wl.current = title.to_owned();
-	
+	wl.current = show.clone();
 
 	save_json(&wl, &path)?;
 
-	println!("Now watching {}", title);
+	println!("Now watching {}", show);
 	Ok(())
 }
 
@@ -104,6 +112,21 @@ pub fn add_show(
 	Ok(())
 }
 
+pub fn remove_list(name: &str) -> Result<bool, String> {
+	let path = gen_path();
+	let mut cfg = read_config();
+	std::fs::remove_file(path).expect(&format!("Unable to remove file {}", name));
+
+	if cfg.current_list.unwrap() == name {
+		cfg.current_list = Some("general".to_owned());
+		Ok(true)
+	}else {
+		Ok(false)
+	}
+
+	
+}
+
 pub fn remove_show(title: &str) -> Result<(), String> {
 	let path = gen_path();
 	let mut wl = read_json(&path)?;
@@ -114,7 +137,6 @@ pub fn remove_show(title: &str) -> Result<(), String> {
 }
 
 pub fn remove_show_id(id: &str) -> Result<String, String>{
-	//need to implement ID's first
 	let path = gen_path();
 	let mut wl = read_json(&path)?;
 	let mut show = None;
@@ -138,8 +160,9 @@ pub fn remove_show_id(id: &str) -> Result<String, String>{
 
 pub fn load_list(name: &str) -> Result<(), String> {
 	let mut cfg = read_config();
-	cfg.lists.push(name.to_string()); // add the name to the list of lists in the config file
+	cfg.current_list = Some(name.to_owned()); // add the name to the list of lists in the config file
 	println!("Switched to list {}", name);
+	save_config(&cfg);
 	Ok(())
 }
 

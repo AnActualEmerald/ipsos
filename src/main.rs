@@ -53,7 +53,7 @@ async fn main() {
 	}
 
 	if let Some(matches) = matches.subcommand_matches("watch") {
-		manager::watch_show(matches.value_of("TITLE").unwrap_or("none"))
+		manager::watch_show(matches.value_of("ID").unwrap_or("none"))
 			.expect("Couldn't watch the show");
 	}
 
@@ -80,6 +80,18 @@ async fn main() {
 			}else {
 				println!("Need a title or ID");
 			}
+		}
+	}
+
+	if let Some(matches) = matches.subcommand_matches("delete") {
+		let list = matches.value_of("NAME");
+		match manager::remove_list(list.unwrap()){
+			Ok(b) => if b {
+				println!("Removed list {}, switched back to the general list", list.unwrap());
+			} else {
+				println!("Removed list {}", list.unwrap());
+			}
+			Err(e) => println!("Unable to remove list: {}", e)
 		}
 	}
 }
