@@ -31,7 +31,7 @@ async fn main() {
 	}
 
 	if let Some(matches) = matches.subcommand_matches("switch") {
-		let name = matches.value_of("NAME").unwrap_or("generic");
+		let name = matches.value_of("NAME").unwrap_or("general");
 		manager::load_list(name)
 			.unwrap_or_else(|_| panic!("Couldn't switch to watchlist {}", name));
 	}
@@ -60,7 +60,6 @@ async fn main() {
 	if let Some(matches) = matches.subcommand_matches("update") {
 		manager::update_show(
 			matches.value_of("TITLE"),
-			matches.value_of("watched"),
 			matches.value_of("length"),
 			matches.is_present("done"),
 		)
@@ -80,23 +79,19 @@ mod tests {
 	#[test]
 	fn json_functions() {
 		let path = PathBuf::from("./test2.json".to_owned());
-		let mut foo = MainList {
-			current: "none".to_owned(),
-			lists: HashMap::new(),
-		};
+
 
 		read_json(&path).expect("Well this is embarrasing");
 		//need to make sure the file exists first, and
 		//for whatever reason i've put that functionality in the read function
 
-		foo.lists.insert(
-			"test".to_owned(),
-			WatchList {
+
+		let foo = WatchList {
 				name: "test".to_owned(),
 				current: "none".to_owned(),
 				shows: HashMap::new(),
-			},
-		);
+			};
+
 		save_json(&foo, &path).expect("Well this is embarrasing");
 
 		if let Ok(bar) = read_json(&path) {
@@ -117,9 +112,10 @@ mod tests {
 
 	#[test]
 	fn path_generation() {
+		//this might fail on my local machine beacues the config file will likely be edited
 		let foo = gen_path();
 		let bar = PathBuf::from(format!(
-			"{}/.ipsos/lists.json",
+			"{}/.ipsos/general.json",
 			dirs::home_dir().unwrap().display()
 		));
 		assert_eq!(foo, bar);

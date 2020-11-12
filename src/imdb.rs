@@ -20,9 +20,9 @@ pub fn get_show_data(title: &str) -> BoxFuture<'_, Option<Show>>{
                 t.set_color(ColorSpec::new().set_fg(Some(Color::White)));
                 write!(t, "Searched on IMDb and got: ");
                 t.set_color(ColorSpec::new().set_fg(Some(Color::Cyan)));
-                write!(t, "{}\n", res.title);
+                write!(t, "{} {}\n", res.title, res.description);
                 t.set_color(ColorSpec::new().set_fg(Some(Color::White)));
-                write!(t, "Add this show to your watchlist? (Y/n/[r]etry) ");
+                write!(t, "Add this show to your watchlist? [Y/n/(r)etry] ");
                 let input = rl.readline("").unwrap_or("y".to_owned());
                 match input.to_lowercase().chars().next() {
                     Some('n') => {
@@ -40,9 +40,8 @@ pub fn get_show_data(title: &str) -> BoxFuture<'_, Option<Show>>{
                         t.reset();
                         Some(Show {
                             title: res.title,
-                            length: get_episodes(res.id).await.unwrap(),
+                            runtime: get_runtime(res.id).await.unwrap(),
                             completed: false,
-                            watched: 0,
                         })
                     }
                     
@@ -58,28 +57,21 @@ pub fn get_show_data(title: &str) -> BoxFuture<'_, Option<Show>>{
     }.boxed()
 }
 
-async fn get_episodes(id: String) -> Result<i32, reqwest::Error> {
-    let mut res: usize = 0;
-    let mut season: i32 = 1;
-    loop{
-        let req = format!("https://imdb-api.com/en/API/SeasonEpisodes/{}/{}/{}", SECRET, id, season);
-        let response: IMDBResult = reqwest::get(&req).await?.json().await?;
-        if response.errorMessage.contains("404") {
-            break;
-        }else {
-            res += response.episodes.len();
-            season += 1;
-        }
-    }
+async fn get_runtime(id: String) -> Result<String, reqwest::Error> {
 
-    Ok(res as i32)
+
+    //IMDb doesn't provide any way to get the total number of episodes in the show
+    let req = format!("https://imdb-api.com/en/API/Title/{}/{}", SECRET, id);
+    let response = reqwest::get(&req).await?.json::<std::collections::HashMap<String, serde_json::Value>>().await?;
+
+
+    Ok(response.get("runtimeStr").unwrap_or(&serde_json::Value::Null).clone().to_string())
 
 }
 
 async fn search_show(title: &str) -> Result<SearchResult, reqwest::Error> {
     let request = format!("https://imdb-api.com/en/API/SearchTitle/{}/{}", SECRET, title);
     let response: SearchData = reqwest::get(&request).await?.json().await?; 
-    
     Ok(response.results[0].clone())
 }
 

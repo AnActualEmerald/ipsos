@@ -67,14 +67,14 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                         .takes_value(true)
                         .help("How many episodes the show has"),
                 )
-                .arg(
-                    Arg::with_name("watched")
-                        .short("w")
-                        .long("watched")
-                        .takes_value(true)
-                        .help("How many episodes you've already watched")
-                        .requires("length"),
-                )
+                // .arg(
+                //     Arg::with_name("watched")
+                //         .short("w")
+                //         .long("watched")
+                //         .takes_value(true)
+                //         .help("How many episodes you've already watched")
+                //         .requires("length"),
+                // )
                 .arg(
                     Arg::with_name("done")
                         .short("d")
@@ -82,40 +82,36 @@ pub fn get_matches<'a>() -> ArgMatches<'a> {
                         .takes_value(false)
                         .help("Have you already finished the show?"),
                 ),
-        )
-        .subcommand(
-            SubCommand::with_name("update")
-                .alias("up")
-                .about("Update a show in the watchlist")
-                .after_help("Running this command with no options will add 1 to the watched episode counter of the current show")
-                .arg(Arg::with_name("TITLE").help(
-                    "The title of the show to update. Will update the current show if omitted",
-                ))
-                .arg(
-                    Arg::with_name("done")
-                        .help("Whether or not you've finished the show")
-                        .long("done")
-                        .short("d"),
-                )
-                .arg(
-                    Arg::with_name("watched")
-                        .help("How many episodes you've watched. Adds to the current total and can be negative. Defaults to +1. Negative values need to use the -w=value form")
-                        .default_value("1")
-                        .takes_value(true)
-                        .long("watched")
-                        .short("w")
-                ).arg(Arg::with_name("length")
-                        .help("How many episodes the show has")
-                        .takes_value(true)
-                        .long("length")
-                        .short("l"))
+        // )
+        // .subcommand(
+        //     SubCommand::with_name("update")
+        //         .alias("up")
+        //         .about("Update a show in the watchlist")
+        //         .after_help("Running this command with no options will add 1 to the watched episode counter of the current show")
+        //         .arg(Arg::with_name("TITLE").help(
+        //             "The title of the show to update. Will update the current show if omitted",
+        //         ))
+        //         .arg(
+        //             Arg::with_name("done")
+        //                 .help("Whether or not you've finished the show")
+        //                 .long("done")
+        //                 .short("d"),
+        //         )
+        //         .arg(
+        //             Arg::with_name("watched")
+        //                 .help("How many episodes you've watched. Adds to the current total and can be negative. Defaults to +1. Negative values need to use the -w=value form")
+        //                 .default_value("1")
+        //                 .takes_value(true)
+        //                 .long("watched")
+        //                 .short("w")
+        //         ).arg(Arg::with_name("length")
+        //                 .help("How many episodes the show has")
+        //                 .takes_value(true)
+        //                 .long("length")
+        //                 .short("l"))
         ).subcommand(SubCommand::with_name("watch")
                 .alias("w")
                 .about("Watch a show from the watchlist")
                 .arg(Arg::with_name("TITLE").help("Title of the show to watch").required(true)))
         .get_matches()
 }
-
-// pub fn make_yaml_app() -> App {
-//     clap::lo
-// }
