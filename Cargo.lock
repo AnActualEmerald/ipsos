@@ -556,7 +556,7 @@ checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
 
 [[package]]
 name = "ipsos"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "clap",
  "dirs 2.0.2",
